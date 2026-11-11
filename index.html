@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agendador de Quimioterapia</title>
+<meta name="description" content="Prototipo funcional: agendamiento de sillones de quimioterapia con el modelo de la tesis (Pham et al. 2023 + Karakaya, Gul y Çelik 2023).">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%223%22 y=%225%22 width=%2226%22 height=%2224%22 rx=%225%22 fill=%22%232F6E9E%22/%3E%3Cpath d=%22M3 12h26%22 stroke=%22%23fff%22 stroke-width=%222.5%22/%3E%3Cpath d=%22M11 2v6M21 2v6%22 stroke=%22%231D3557%22 stroke-width=%223%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header class="barra">
+  <div>
+    <div class="ceja">Prototipo funcional · Tesis de Magíster UAI · Sebastián Lebuy</div>
+    <h1>Agendador de sillones de quimioterapia</h1>
+  </div>
+  <div class="hoy">
+    <div class="hoy-txt"><span>Hoy en la agenda</span><b id="hoyFecha">—</b></div>
+    <button id="btnAvanzar" class="sec" title="Los pacientes nuevos se admiten en el día actual">Avanzar al día hábil siguiente →</button>
+  </div>
+</header>
+
+<main class="grid">
+  <aside class="lateral">
+    <details class="caja" id="cajaUnidad">
+      <summary>Configuración de la unidad</summary>
+      <div class="campos">
+        <label>Sillones de quimioterapia
+          <select id="cfgSillones"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></label>
+        <label>Régimen de restricción
+          <select id="cfgRegimen">
+            <option value="alternante">Alternante (semanas de sillón y de enfermería limitante)</option>
+            <option value="sillon_limitante">Sillón limitante (sillones fuera de servicio)</option>
+            <option value="enfermeria_limitante">Enfermería limitante (ausencias)</option>
+          </select></label>
+        <div class="dos">
+          <label>Reserva para urgentes γ
+            <select id="cfgGamma"><option value="0">0%</option><option value="0.05">5%</option><option value="0.1" selected>10%</option><option value="0.2">20%</option></select></label>
+          <label>Carga máx. por enfermera/o (m)
+            <input id="cfgM" type="number" min="3" max="12" value="6"></label>
+        </div>
+        <div class="dos">
+          <label>Sillones por enfermera/o (al generar)
+            <input id="cfgRatio" type="number" min="1" max="4" value="2"></label>
+          <label>Semilla
+            <input id="cfgSemilla" type="number" min="1" max="99999" value="42"></label>
+        </div>
+        <p class="nota" id="cfgModelo"></p>
+        <button id="btnGenerar" class="sec ancho">Generar nueva agenda inicial</button>
+        <p class="nota">La agenda inicial se llena con pacientes simulados (calentamiento hasta 90% de ocupación, como en el modelo). Generarla borra los ingresos manuales.</p>
+      </div>
+    </details>
+
+    <section class="caja" id="cajaIngreso">
+      <h2>Ingresar paciente</h2>
+      <form id="formIngreso" autocomplete="off">
+        <label>Nombre o identificador <input id="inNombre" type="text" maxlength="40" placeholder="Opcional"></label>
+        <div class="etq">Categoría de urgencia</div>
+        <div class="cats" id="inCat"></div>
+        <label>Protocolo de quimioterapia <select id="inProt"></select></label>
+        <div class="rango">
+          <label for="inDur">Duración por sesión <b id="inDurTxt"></b></label>
+          <input id="inDur" type="range" min="35" max="235" step="5" value="120">
+          <small>Incluye 15 min de premedicación. Rango de Karakaya et al. (2023): 35 a 235 min.</small>
+        </div>
+        <div class="etq">Agudeza (atención de enfermería que requiere)</div>
+        <div class="seg" id="inKappa">
+          <button type="button" data-v="1" class="on">1 · baja</button><button type="button" data-v="2">2 · media</button><button type="button" data-v="3">3 · alta</button>
+        </div>
+        <div class="rango">
+          <label for="inPrep">Días de preparación <b id="inPrepTxt"></b></label>
+          <input id="inPrep" type="range" min="0" max="10" step="1" value="3">
+          <small id="inPrepAyuda"></small>
+        </div>
+        <div class="etq">Turno preferido</div>
+        <div class="seg" id="inTurno">
+          <button type="button" data-v="" class="on">Indiferente</button><button type="button" data-v="0">AM 08–12</button><button type="button" data-v="1">PM 12–16</button>
+        </div>
+        <button type="submit" class="pri ancho">Calcular propuesta de agenda</button>
+      </form>
+      <div id="propuesta"></div>
+    </section>
+  </aside>
+
+  <section class="principal">
+    <div class="kpis" id="kpis"></div>
+
+    <section class="caja">
+      <div class="cab-cal">
+        <button id="btnAnt" class="sec" aria-label="Día anterior">‹</button>
+        <div class="fecha-cal"><b id="calFecha"></b><span id="calSub"></span></div>
+        <button id="btnSig" class="sec" aria-label="Día siguiente">›</button>
+        <button id="btnHoy" class="sec">Ir a hoy</button>
+      </div>
+      <div id="vistaPrevia" class="aviso-previa" hidden></div>
+      <div class="cal-scroll"><div class="calendario" id="calendario"></div></div>
+      <div class="leyenda" id="leyenda"></div>
+    </section>
+
+    <section class="caja">
+      <h3>Ocupación de los próximos 60 días hábiles <small>(clic para ver el día)</small></h3>
+      <div class="franja" id="franja"></div>
+    </section>
+
+    <section class="caja">
+      <div class="cab-tabla">
+        <h3>Pacientes</h3>
+        <label class="chk"><input type="checkbox" id="verPrevios"> Mostrar también pacientes en tratamiento</label>
+        <button id="btnCsv" class="sec">Descargar agenda (CSV)</button>
+      </div>
+      <div class="tabla-envoltura"><table id="tabla"></table></div>
+    </section>
+
+    <details class="caja">
+      <summary>¿Cómo funciona este prototipo?</summary>
+      <div class="explica">
+        <p><b>Modelo.</b> Es el modelo final de la tesis: el agendamiento online basado en predicción de Pham et al. (2023) sobre un servidor tripartito de quimioterapia (Karakaya, Gul y Çelik, 2023). Un paciente se atiende en un sillón y turno solo si el sillón está en servicio, la enfermería presente alcanza a cubrirlo (cada enfermera/o cubre <span class="v-ratio">2</span> sillones) y se registra la carga de enfermería del turno (suma de agudezas, máximo <span class="v-m">6</span> puntos por enfermera/o).</p>
+        <p><b>Urgentes (P1, P2).</b> Van a la primera fecha disponible desde que están listos. <b>Programados (P3, P4).</b> Un regresor XGBoost, entrenado con soluciones óptimas que conocen el futuro, predice cuántos días conviene que esperen según el estado de la agenda; se busca la primera fecha disponible desde ahí y se respeta la reserva γ para urgentes. Todas las sesiones del protocolo quedan reservadas en el mismo sillón y turno, en las fechas que fija el esquema.</p>
+        <p><b>Reacomodo.</b> Si el paciente puede empezar antes moviendo sesiones futuras de otros pacientes a otro sillón del mismo día y turno, se ofrece como segunda opción. A esos pacientes no les cambia la fecha, el turno ni el protocolo: solo el sillón y la hora dentro del turno. Se respetan la capacidad de cada sillón, la cobertura de enfermería y los sillones fuera de servicio, y la carga del turno no cambia. Para los programados nunca se adelanta la fecha que sugiere el modelo.</p>
+        <p><b>Referencia.</b> Cada propuesta muestra también la regla greedy de referencia de Pham et al. (regla del hospital CHUM): los programados miran una (P3) o dos (P4) semanas hacia adelante.</p>
+        <p><b>Datos.</b> Todos los pacientes son simulados. Los datos se guardan solo en este navegador. Plazos GES: P2 linfoma 10 días, P3 mama y colorrectal 30 días; P1 (5 días) y P4 (45 días) son supuestos. Más contexto en la <a href="https://sebalebuy1.github.io/agendamiento-radioterapia/" target="_blank" rel="noopener">página explicativa del proyecto</a>.</p>
+      </div>
+    </details>
+  </section>
+</main>
+
+<div id="detalle" class="detalle" hidden></div>
+<div id="cargando" class="cargando">Cargando el modelo…</div>
+
+<script src="motor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
