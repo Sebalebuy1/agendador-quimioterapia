@@ -440,8 +440,9 @@
   }
 
   function renderTabla() {
-    const ag = agenda, ver = $('verPrevios').checked;
-    const lista = ag.pacientes.filter(p => ver || !p.previo).slice().reverse();
+    // Por defecto todos los pacientes (los ingresados a mano primero); marcando la casilla, solo los ingresados a mano
+    const ag = agenda, solo = $('soloManuales').checked;
+    const lista = ag.pacientes.filter(p => !solo || !p.previo).slice().reverse();
     if (!lista.length) { $('tabla').innerHTML = '<tr><td class="vacio">Aún no hay ingresos manuales. Usa el formulario “Ingresar paciente”.</td></tr>'; return; }
     let h = '<tr><th>ID</th><th>Nombre</th><th>Cat.</th><th>Protocolo</th><th>Admisión</th><th>Inicio</th><th>Espera</th><th>GES</th><th>Sillón · turno</th><th>Próxima sesión</th><th>w̄</th><th>Estado</th></tr>';
     for (const p of lista) {
@@ -502,7 +503,7 @@
     $('btnSig').onclick = () => { diaVista = Math.min(agenda.T - 1, diaVista + 1); render(); };
     $('btnHoy').onclick = () => { diaVista = agenda.diaActual; render(); };
     $('franja').onclick = e => { const b = e.target.closest('button'); if (b) { diaVista = +b.dataset.dia; render(); } };
-    $('verPrevios').onchange = renderTabla;
+    $('soloManuales').onchange = renderTabla;
     $('tabla').onclick = e => {
       const tr = e.target.closest('tr[data-pid]'); if (!tr) return;
       const p = agenda.pacientePorId(tr.dataset.pid), prox = p.sesiones.find(id => agenda.sesiones[id].dia >= agenda.diaActual);
@@ -534,7 +535,7 @@
   }
 
   // ── Inicio ──
-  fetch('modelo.json?v=202611111846').then(r => r.json()).then(j => {
+  fetch('modelo.json?v=202611111852').then(r => r.json()).then(j => {
     datos = j; cfg = j.config;
     if (!recuperar()) nuevaAgenda();
     diaVista = agenda.diaActual;

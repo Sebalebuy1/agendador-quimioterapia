@@ -7,7 +7,7 @@
 <title>Agendador de Quimioterapia</title>
 <meta name="description" content="Prototipo funcional: agendamiento de sillones de quimioterapia con el modelo de la tesis (Pham et al. 2023 + Karakaya, Gul y Çelik 2023).">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%223%22 y=%225%22 width=%2226%22 height=%2224%22 rx=%225%22 fill=%22%232F6E9E%22/%3E%3Cpath d=%22M3 12h26%22 stroke=%22%23fff%22 stroke-width=%222.5%22/%3E%3Cpath d=%22M11 2v6M21 2v6%22 stroke=%22%231D3557%22 stroke-width=%223%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
-<link rel="stylesheet" href="estilos.css?v=202611111846">
+<link rel="stylesheet" href="estilos.css?v=202611111852">
 </head>
 <body>
 <header class="barra">
@@ -103,7 +103,7 @@
     <section class="caja">
       <div class="cab-tabla">
         <h3>Pacientes</h3>
-        <label class="chk"><input type="checkbox" id="verPrevios"> Mostrar también pacientes en tratamiento</label>
+        <label class="chk"><input type="checkbox" id="soloManuales"> Mostrar solo pacientes ingresados a mano</label>
         <button id="btnCsv" class="sec">Descargar agenda (CSV)</button>
       </div>
       <div class="tabla-envoltura"><table id="tabla"></table></div>
@@ -126,7 +126,7 @@
 <div id="detalle" class="detalle" hidden></div>
 <div id="cargando" class="cargando">Cargando el modelo…</div>
 
-<script src="motor.js?v=202611111846"></script>
-<script src="app.js?v=202611111846"></script>
+<script src="motor.js?v=202611111852"></script>
+<script src="app.js?v=202611111852"></script>
 </body>
 </html>
