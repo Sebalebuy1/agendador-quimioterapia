@@ -535,7 +535,7 @@
   }
 
   // ── Inicio ──
-  fetch('modelo.json').then(r => r.json()).then(j => {
+  fetch('modelo.json?v=202611111835').then(r => r.json()).then(j => {
     datos = j; cfg = j.config;
     if (!recuperar()) nuevaAgenda();
     diaVista = agenda.diaActual;
