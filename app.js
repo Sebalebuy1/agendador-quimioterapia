@@ -102,9 +102,8 @@
     actualizarPrep();
   }
   function actualizarPrep() {
-    const v = +$('inPrep').value, [lo, hi] = catCfg(form.cat).listo, r = agenda.diaActual + v;
+    const v = +$('inPrep').value;
     $('inPrepTxt').textContent = `${v} día${v === 1 ? '' : 's'} hábil${v === 1 ? '' : 'es'}`;
-    $('inPrepAyuda').textContent = `Listo para iniciar el ${corta(r)}. Rango habitual para ${catNom(form.cat)}: ${lo}–${hi} días (exámenes previos, validación de farmacia, catéter).`;
   }
 
   // ── Bloques comunes de las propuestas ──
@@ -535,7 +534,7 @@
   }
 
   // ── Inicio ──
-  fetch('modelo.json?v=202611111835').then(r => r.json()).then(j => {
+  fetch('modelo.json?v=202611111846').then(r => r.json()).then(j => {
     datos = j; cfg = j.config;
     if (!recuperar()) nuevaAgenda();
     diaVista = agenda.diaActual;
