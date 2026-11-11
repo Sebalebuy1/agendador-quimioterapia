@@ -168,9 +168,9 @@
       let b = this.cfg.TURNOS[s][0];
       for (const id of lista) { this.sesiones[id].bloque = b; b += this.sesiones[id].dur; }
     }
-    agregarSesion(pid, dia, l, s, dur) {
+    agregarSesion(pid, dia, l, s, dur, kappa) {
       const id = this.sesiones.length, key = this.srv.i(l, dia, s);
-      this.sesiones.push({ id, pid, dia, l, s, dur, bloque: 0 });
+      this.sesiones.push({ id, pid, dia, l, s, dur, kappa, bloque: 0 });
       if (!this.orden.has(key)) this.orden.set(key, []);
       this.orden.get(key).push(id); this.reapilar(key);
       return id;
@@ -179,7 +179,7 @@
     agendar(p, t, l, s) {
       const offs = this.offs(p.prot);
       this.srv.reservar(t, l, s, offs, p.dur, p.kappa);
-      p.sesiones = offs.map(o => this.agregarSesion(p.pid, t + o, l, s, p.dur));
+      p.sesiones = offs.map(o => this.agregarSesion(p.pid, t + o, l, s, p.dur, p.kappa));
       p.inicio = t; p.sillon = l; p.turno = s;
       this.pacientes.push(p);
     }
@@ -236,7 +236,7 @@
         const pac = { pid, nombre: 'En tratamiento', previo: true, cat: p.cat, prot: p.prot, dur: p.dur, kappa: p.kappa,
           a: p.a - t0, r: p.r - t0, d: p.d - t0, inicio: p.t - t0, sillon: p.l, turno: p.s,
           sesionesPrevias: offs.length - futuras.length };
-        pac.sesiones = futuras.map(o => this.agregarSesion(pid, p.t + o - t0, p.l, p.s, p.dur));
+        pac.sesiones = futuras.map(o => this.agregarSesion(pid, p.t + o - t0, p.l, p.s, p.dur, p.kappa));
         this.pacientes.push(pac);
       }
       this.contador = 0;
@@ -329,34 +329,169 @@
     }
     pacientePorId(pid) { return this.pacientes.find(p => p.pid === pid); }
 
+    // ── Contabilidad comun de las ediciones ──
+    // Foto de sillon, turno y hora de cada sesion vigente, para informar despues que cambio
+    snapshot() {
+      return new Map(this.sesiones.filter(x => !x.anulada).map(x => [x.id, { l: x.l, s: x.s, bloque: x.bloque, dur: x.dur }]));
+    }
+    diferencias(antes, excluirPid) {
+      return this.sesiones.filter(x => !x.anulada && antes.has(x.id) && x.pid !== excluirPid &&
+          (antes.get(x.id).l !== x.l || antes.get(x.id).s !== x.s || antes.get(x.id).bloque !== x.bloque))
+        .map(x => ({ id: x.id, pid: x.pid, dia: x.dia, turno: x.s, turnoAntes: antes.get(x.id).s, de: antes.get(x.id).l,
+                     a: x.l, bloqueAntes: antes.get(x.id).bloque, bloque: x.bloque }));
+    }
+    // Saca una sesion de su sillon-turno (sin tocar la lista de sesiones del paciente)
+    desmontar(ses) {
+      const k = this.srv.i(ses.l, ses.dia, ses.s);
+      this.srv.libre[k] += ses.dur; this.srv.carga[k] -= ses.kappa;
+      this.orden.set(k, (this.orden.get(k) || []).filter(id => id !== ses.id));
+      if (!this.orden.get(k).length) this.srv.abierto[k] = 0;
+      this.reapilar(k);
+    }
+    // Pone una sesion en (l, s) de su mismo dia, en la posicion 'pos' (al final si se omite)
+    montar(ses, l, s, pos) {
+      const k = this.srv.i(l, ses.dia, s);
+      this.srv.libre[k] -= ses.dur; this.srv.carga[k] += ses.kappa; this.srv.abierto[k] = 1;
+      if (!this.orden.has(k)) this.orden.set(k, []);
+      const lista = this.orden.get(k);
+      lista.splice(pos == null ? lista.length : pos, 0, ses.id);
+      ses.l = l; ses.s = s;
+      this.reapilar(k);
+    }
+    aplicarMovidas(movidas) {
+      for (const mv of movidas) { const ses = this.sesiones[mv.sesion]; this.desmontar(ses); this.montar(ses, mv.a, mv.turno); }
+    }
+    // Anula las sesiones del paciente desde la k-esima (todas futuras) y libera sus cupos
+    quitarSesiones(pid, k) {
+      const p = this.pacientePorId(pid), ids = p.sesiones.slice(k);
+      for (const id of ids) { const ses = this.sesiones[id]; this.desmontar(ses); ses.anulada = true; }
+      p.sesiones = p.sesiones.slice(0, k);
+      return ids;
+    }
+
     // Aplica una propuesta ('estandar' o 'reacomodo'); retorna el paciente y los cambios de hora
     aplicar(prop, opcion, nombre) {
-      const sol = prop[opcion], antes = new Map(this.sesiones.map(x => [x.id, { l: x.l, bloque: x.bloque }]));
-      if (opcion === 'reacomodo') {
-        const tocadas = new Set();
-        for (const mv of sol.movidas) {
-          const ses = this.sesiones[mv.sesion], pac = this.pacientePorId(ses.pid);
-          const k0 = this.srv.i(mv.de, mv.dia, mv.turno), k1 = this.srv.i(mv.a, mv.dia, mv.turno);
-          this.srv.libre[k0] += ses.dur; this.srv.libre[k1] -= ses.dur;
-          this.srv.carga[k0] -= pac.kappa; this.srv.carga[k1] += pac.kappa;
-          this.srv.abierto[k1] = 1;
-          this.orden.set(k0, this.orden.get(k0).filter(id => id !== ses.id));
-          if (!this.orden.get(k0).length) this.srv.abierto[k0] = 0;
-          if (!this.orden.has(k1)) this.orden.set(k1, []);
-          this.orden.get(k1).push(ses.id); ses.l = mv.a;
-          tocadas.add(k0); tocadas.add(k1);
-        }
-        for (const k of tocadas) this.reapilar(k);
-      }
+      const sol = prop[opcion], antes = this.snapshot();
+      if (opcion === 'reacomodo') this.aplicarMovidas(sol.movidas);
       const pid = 'N-' + String(++this.contador).padStart(3, '0');
       const pac = { pid, nombre: nombre || `Paciente ${this.contador}`, previo: false, cat: prop.cat, prot: prop.prot,
         dur: prop.dur, kappa: prop.kappa, a: prop.a, r: prop.r, d: prop.d, w: prop.w, wbar: prop.wbar,
         opcion, sesionesPrevias: 0 };
       this.agendar(pac, sol.t, sol.l, sol.s);
-      const cambios = this.sesiones.filter(x => antes.has(x.id) && (antes.get(x.id).l !== x.l || antes.get(x.id).bloque !== x.bloque))
-        .map(x => ({ id: x.id, pid: x.pid, dia: x.dia, turno: x.s, de: antes.get(x.id).l, a: x.l,
-                     bloqueAntes: antes.get(x.id).bloque, bloque: x.bloque }));
-      return { pac, cambios };
+      return { pac, cambios: this.diferencias(antes, pid) };
+    }
+
+    // ── Edicion de una reserva existente ──
+    // Cupos posibles el mismo dia para la sesion 'sid': cada sillon-turno en servicio y cada posicion
+    // dentro de su orden. La hora resulta de apilar las sesiones del sillon-turno desde el inicio del turno.
+    opcionesHora(sid) {
+      const srv = this.srv, ses = this.sesiones[sid], pac = this.pacientePorId(ses.pid), u = ses.dia;
+      const k0 = srv.i(ses.l, u, ses.s), lista0 = this.orden.get(k0) || [], pos0 = lista0.indexOf(sid);
+      const opciones = [];
+      for (let s = 0; s < srv.S; s++) for (let l = 0; l < srv.L; l++) {
+        if (!srv.disp[srv.d(l, u)]) continue;
+        const mismo = l === ses.l && s === ses.s, k = srv.i(l, u, s);
+        const lista = (this.orden.get(k) || []).filter(id => id !== sid);
+        const usado = lista.reduce((a, id) => a + this.sesiones[id].dur, 0);
+        if (usado + ses.dur > srv.cap[s] + 1e-9) continue;
+        if (!mismo && !lista.length) {                      // hay que abrir el sillon-turno: cobertura de enfermeria
+          const libera = s === ses.s && lista0.length === 1 ? 1 : 0;
+          if (srv.equiposLibres(u, s) + libera < 1) continue;
+        }
+        const sobre = s !== ses.s && srv.cargaTurno(u, s) + ses.kappa > srv.capCarga(u, s);
+        let b = this.cfg.TURNOS[s][0];
+        for (let pos = 0; pos <= lista.length; pos++) {
+          const actual = mismo && pos === pos0;
+          const desplaza = (lista.length - pos) + (mismo ? 0 : lista0.length - 1 - pos0);
+          const desplazaReal = mismo ? Math.abs(pos - pos0) : desplaza;
+          opciones.push({ l, s, pos, bloque: b, actual, desplaza: actual ? 0 : desplazaReal, sobrecarga: sobre, cambiaSillon: l !== ses.l, cambiaTurno: s !== ses.s });
+          if (pos < lista.length) b += this.sesiones[lista[pos]].dur;
+        }
+      }
+      // Sugerencia: no mover a otros, mismo turno, mismo sillon y la hora mas cercana a la actual
+      const peso = o => (o.actual ? 1e6 : 0) + o.desplaza * 1000 + (o.sobrecarga ? 500 : 0) + (o.cambiaTurno ? 200 : 0) +
+                        (o.cambiaSillon ? 50 : 0) + Math.abs(o.bloque - ses.bloque) / 10;
+      const sugerida = opciones.filter(o => !o.actual).sort((x, y) => peso(x) - peso(y))[0] || null;
+      opciones.sort((x, y) => x.bloque - y.bloque || x.s - y.s || x.l - y.l);
+      return { opciones, sugerida };
+    }
+    aplicarHora(sid, l, s, pos) {
+      const ses = this.sesiones[sid], antes = this.snapshot();
+      this.desmontar(ses); this.montar(ses, l, s, pos);
+      return { cambios: this.diferencias(antes, null) };
+    }
+    // Duracion (solo esta sesion o tambien las siguientes), agudeza (sesiones futuras) y nombre
+    editarDatos(sid, cambios) {
+      const ses = this.sesiones[sid], p = this.pacientePorId(ses.pid), srv = this.srv, antes = this.snapshot();
+      const desde = p.sesiones.indexOf(sid);
+      const objetivo = cambios.dur == null ? [] : (cambios.todas ? p.sesiones.slice(desde) : [sid]);
+      const fallas = [];
+      for (const id of objetivo) {
+        const x = this.sesiones[id], delta = cambios.dur - x.dur;
+        if (delta > srv.libre[srv.i(x.l, x.dia, x.s)] + 1e-9) fallas.push(x.dia);
+      }
+      if (fallas.length) return { ok: false, fallas };
+      for (const id of objetivo) {
+        const x = this.sesiones[id], k = srv.i(x.l, x.dia, x.s);
+        srv.libre[k] -= cambios.dur - x.dur; x.dur = cambios.dur; this.reapilar(k);
+      }
+      if (cambios.todas && cambios.dur != null) p.dur = cambios.dur;
+      if (cambios.kappa != null && cambios.kappa !== p.kappa) {
+        for (const id of p.sesiones) {
+          const x = this.sesiones[id];
+          if (x.dia >= this.diaActual) { srv.carga[srv.i(x.l, x.dia, x.s)] += cambios.kappa - x.kappa; x.kappa = cambios.kappa; }
+        }
+        p.kappa = cambios.kappa;
+      }
+      if (cambios.nombre) p.nombre = cambios.nombre;
+      return { ok: true, cambios: this.diferencias(antes, null) };
+    }
+    cancelarDesde(sid) {
+      const ses = this.sesiones[sid], p = this.pacientePorId(ses.pid), k = p.sesiones.indexOf(sid), antes = this.snapshot();
+      const n = this.quitarSesiones(p.pid, k).length;
+      p.canceladas = (p.canceladas || 0) + n;
+      return { n, cambios: this.diferencias(antes, p.pid) };
+    }
+    // Reagenda las sesiones desde 'sid' hasta el final del protocolo, manteniendo su espaciado.
+    //  - Paciente que aun no empieza: el modelo recalcula su fecha hoy (Algoritmo 2: urgentes a la primera
+    //    fecha disponible; programados con la espera que predice el regresor) y se compara con el greedy.
+    //  - Paciente en tratamiento: primer cupo desde la fecha 'noAntes' (por defecto, la fecha actual de la sesion).
+    proponerReagenda(sid, opciones) {
+      opciones = opciones || {};
+      const ses = this.sesiones[sid], p = this.pacientePorId(ses.pid), k = p.sesiones.indexOf(sid);
+      const ids = p.sesiones.slice(k), rel = ids.map(id => this.sesiones[id].dia - ses.dia);
+      const dur = Math.max(...ids.map(id => this.sesiones[id].dur)), kappa = p.kappa, cat = p.cat;
+      const urgente = this.esUrgente(cat), gamma = urgente ? 0 : this.opts.gamma;
+      const turnos = opciones.turno == null ? null : [opciones.turno];
+      const completo = k === 0 && !p.previo;
+      const copia = this.copia(); copia.quitarSesiones(p.pid, k);
+      const a = this.diaActual, noAntes = Math.max(a, opciones.noAntes == null ? (completo ? a : ses.dia) : opciones.noAntes);
+      let w = null, wbar = null, desde, greedy = null;
+      if (completo) {
+        const r = Math.max(p.r, a);
+        if (urgente) desde = r;
+        else {
+          const x = copia.srv.estadoF3(a).concat([r - a, rel.length, p.d - a, dur, rel[rel.length - 1] + 1, kappa]);
+          w = predecir(this.modelo, x); wbar = Math.max(0, Math.floor(w + 0.5)); desde = Math.max(a + wbar, r);
+        }
+        desde = Math.max(desde, noAntes);
+        greedy = copia.srv.primerDiaElegible(Math.max(this.inicioGreedy(cat, a, r), noAntes), rel, dur, gamma, 0, kappa, turnos);
+      } else desde = noAntes;
+      const estandar = copia.srv.primerDiaElegible(desde, rel, dur, gamma, 0, kappa, turnos);
+      const limite = estandar ? estandar.t - 1 : Math.min(desde + 60, this.T - rel[rel.length - 1] - 1);
+      const reacomodo = copia.buscarReacomodo(desde, limite, rel, dur, kappa, gamma, turnos);
+      return { sid, pid: p.pid, k, rel, dur, kappa, cat, urgente, completo, original: ses.dia, origL: ses.l, origS: ses.s,
+               a, d: p.d, w, wbar, desde, gamma, estandar, greedy, reacomodo };
+    }
+    aplicarReagenda(prop, opcion) {
+      const sol = prop[opcion], p = this.pacientePorId(prop.pid), antes = this.snapshot();
+      this.quitarSesiones(p.pid, prop.k);
+      if (opcion === 'reacomodo') this.aplicarMovidas(sol.movidas);
+      this.srv.reservar(sol.t, sol.l, sol.s, prop.rel, prop.dur, prop.kappa);
+      p.sesiones = p.sesiones.concat(prop.rel.map(o => this.agregarSesion(p.pid, sol.t + o, sol.l, sol.s, prop.dur, prop.kappa)));
+      if (prop.k === 0) p.inicio = sol.t;
+      p.sillon = sol.l; p.turno = sol.s; p.reagendas = (p.reagendas || 0) + 1;
+      return { pac: p, cambios: this.diferencias(antes, p.pid) };
     }
 
     // Vista previa: aplica la propuesta sobre una copia y entrega los cambios, sin tocar la agenda
@@ -383,6 +518,8 @@
       o.srv.carga = Float64Array.from(j.srv.carga); o.srv.disp = Uint8Array.from(j.srv.disp);
       o.srv.dotacion = Int32Array.from(j.srv.dotacion);
       o.pacientes = j.pacientes; o.sesiones = j.sesiones; o.orden = new Map(j.orden);
+      // Agendas guardadas antes de registrar la agudeza por sesion
+      for (const x of o.sesiones) if (x.kappa == null) x.kappa = (o.pacientePorId(x.pid) || {}).kappa || 0;
       o.diaActual = j.diaActual; o.contador = j.contador;
       return o;
     }

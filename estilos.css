@@ -146,3 +146,18 @@ tr.fila-pac { cursor: pointer; } tr.fila-pac:hover { background: #F4F8FB; }
   .franja { grid-template-columns: repeat(30, 1fr); }
   .franja button:nth-child(n+31) { display: none; }
 }
+
+/* Gestion de una reserva */
+.gestion { border-color: var(--azul2); box-shadow: 0 0 0 3px rgba(76,141,191,.18); }
+.ges-cab { display: flex; justify-content: space-between; align-items: center; }
+.ges-cab h2 { margin: 0; }
+.ges-cab .cerrar { background: none; border: 0; font-size: 22px; line-height: 1; color: var(--mut); padding: 2px 8px; }
+.ficha { font-size: 13px; color: #334155; margin: 8px 0 12px; line-height: 1.45; }
+.ficha .punto { vertical-align: 1px; }
+.seg.tabs button { font-weight: 600; }
+.peligro { background: #B4232F; } .peligro:hover { background: #8E1B25; }
+.ok-msg { background: #E4F5EC; border-color: #B9E1CB; margin-bottom: 10px; }
+.error-msg { background: #FDECEE; border-color: #F3C6CA; margin-bottom: 10px; }
+.ses.editando { box-shadow: 0 0 0 3px var(--navy); opacity: 1; z-index: 2; }
+.ses:hover { filter: brightness(.96); }
+.gestion select { width: 100%; }

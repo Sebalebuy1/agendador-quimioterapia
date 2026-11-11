@@ -10,4 +10,6 @@ Agenda pacientes de quimioterapia con el modelo final de la tesis:
 
 La agenda inicial se llena con pacientes simulados. Los pacientes nuevos se ingresan a mano. Cuando conviene, el sistema propone reacomodar sesiones futuras de otros pacientes a otro sillón del mismo día y turno.
 
+Al hacer clic en una reserva del calendario se puede cambiar su hora (cupos posibles el mismo día), editar sus datos (duración, agudeza, nombre), reagendar lo que queda del protocolo con el mismo motor (mejor cupo, con reacomodo opcional y referencia greedy) o cancelarla.
+
 Sitio: https://sebalebuy1.github.io/agendador-quimioterapia/ · Todos los datos son simulados y se guardan solo en el navegador.
