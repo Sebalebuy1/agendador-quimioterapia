@@ -400,9 +400,7 @@
     for (let x = cfg.HORA_INI; x <= cfg.HORA_FIN; x++) h += `<span class="h" style="left:${(x - cfg.HORA_INI) / (cfg.HORA_FIN - cfg.HORA_INI) * 100}%">${String(x).padStart(2, '0')}:00</span>`;
     h += '</div></div><div class="turnos-cab"><div></div><div class="pista">';
     cfg.TURNOS.forEach(([i, f], s) => {
-      const enf = srv.dotacion[d * srv.S + s], cpe = srv.cargaPorEnf(d, s), sob = srv.cargaTurno(d, s) > srv.capCarga(d, s);
-      h += `<div class="turno-cab" style="left:${pct(i)};width:${pct(f - i)}"><b>Turno ${turnoNom(s)}</b> · ${enf} enfermera/o${enf === 1 ? '' : 's'} (cubren ${Math.min(srv.cubribles(d, s), srv.L)} de ${srv.L} sillones)<br>` +
-           `<span class="${sob ? 'sobre' : ''}">carga ${num(cpe)} de ${srv.m} puntos por enfermera/o${sob ? ' · sobrecarga' : ''}</span></div>`;
+      h += `<div class="turno-cab" style="left:${pct(i)};width:${pct(f - i)}"><b>Turno ${turnoNom(s)}</b></div>`;
     });
     h += '</div></div>';
     for (let l = 0; l < srv.L; l++) {
