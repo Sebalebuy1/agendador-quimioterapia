@@ -389,24 +389,6 @@
     return null;
   }
 
-  function renderKPIs() {
-    const ag = agenda, srv = ag.srv, d0 = ag.diaActual;
-    let oc = 0, act = 0, sobre = 0;
-    for (let t = d0; t < d0 + 10; t++) {
-      oc += srv.ocupacion(t);
-      for (let s = 0; s < srv.S; s++) if (srv.abiertos(t, s)) { act++; if (srv.cargaTurno(t, s) > srv.capCarga(t, s)) sobre++; }
-    }
-    const nuevos = ag.pacientes.filter(p => !p.previo && p.sesiones.length), enTrat = ag.pacientes.filter(p => p.sesiones.some(id => ag.sesiones[id].dia >= d0)).length;
-    const ges = nuevos.length ? Math.round(nuevos.filter(cumpleGes).length / nuevos.length * 100) + '%' : '—';
-    const espera = nuevos.length ? num(nuevos.reduce((a, p) => a + p.inicio - p.a, 0) / nuevos.length) + ' d' : '—';
-    const reac = nuevos.filter(p => p.opcion === 'reacomodo').length;
-    const k = [[Math.round(oc / 10 * 100) + '%', 'Ocupación próximos 10 días'], [enTrat, 'Pacientes en tratamiento'],
-      [nuevos.length, `Ingresos manuales${reac ? ' · ' + reac + ' con reacomodo' : ''}`],
-      [espera, 'Espera media de ingresos (hábiles)'], [ges, 'Ingresos dentro de plazo GES'],
-      [`${sobre} de ${act}`, 'Turnos con sobrecarga de enfermería (10 días)']];
-    $('kpis').innerHTML = k.map(([v, t]) => `<div class="kpi"><b>${v}</b><span>${t}</span></div>`).join('');
-  }
-
   function renderCalendario() {
     const pv = previa(), ag = pv ? pv.agenda : agenda, srv = ag.srv, d = diaVista, pct = b => (b / cfg.CAP_DIA * 100) + '%';
     const foco = pv ? pv.foco : new Set(), movidas = pv ? pv.movidas : new Set(), editando = gestion ? gestion.sid : null;
@@ -487,7 +469,7 @@
       `(λ = ${num(met.lam, 2)}): R² ${num(met.R2, 2)} y error medio ${num(met.MAE)} días en instancias de prueba.`;
     document.querySelectorAll('.v-ratio').forEach(e => { e.textContent = agenda.opts.ratio; });
     document.querySelectorAll('.v-m').forEach(e => { e.textContent = agenda.opts.m; });
-    renderGestion(); renderKPIs(); renderPropuesta(); renderCalendario(); renderFranja(); renderTabla(); actualizarPrep();
+    renderGestion(); renderPropuesta(); renderCalendario(); renderFranja(); renderTabla(); actualizarPrep();
   }
 
   function descargarCsv() {
